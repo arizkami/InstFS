@@ -1,0 +1,123 @@
+# InstFS Makefile
+# Builds the Instrument File System library and tools
+
+CC = gcc
+AS = as
+AR = ar
+
+# Directories
+SRC_DIR = src
+BUILD_DIR = build
+OBJ_DIR = $(BUILD_DIR)/obj
+
+# Flags
+LIB_CFLAGS = -Wall -Wextra -O2 -fPIC -I$(SRC_DIR)
+TOOL_CFLAGS = -Wall -Wextra -O2 -I$(SRC_DIR)
+ASFLAGS = 
+
+# --- Files ---
+
+# Library source files
+C_SOURCES = src/instfs.c src/osmp_meta.c
+ASM_SOURCES = src/headerfs.S
+
+# Map sources to objects in the build directory
+LIB_OBJECTS = $(C_SOURCES:%.c=$(OBJ_DIR)/%.o) $(ASM_SOURCES:%.S=$(OBJ_DIR)/%.o)
+
+# Tool source files
+TOOL_SOURCES = src/mkfs.osmp.c
+TOOL_OBJECTS = $(TOOL_SOURCES:%.c=$(OBJ_DIR)/%.o)
+
+FUSE_SOURCES = src/instfs_fuse.c
+FUSE_OBJECTS = $(FUSE_SOURCES:%.c=$(OBJ_DIR)/%.o)
+
+# Outputs (placed in build directory)
+LIBRARY = $(BUILD_DIR)/libinstfs.a
+SHARED_LIB = $(BUILD_DIR)/libinstfs.so
+TOOL = $(BUILD_DIR)/mkfs.osmp
+FUSE_TOOL = $(BUILD_DIR)/instfs_fuse
+
+.PHONY: all clean install tools
+
+all: $(LIBRARY) $(SHARED_LIB) tools $(FUSE_TOOL)
+
+# --- Library Linking ---
+
+# Static library
+$(LIBRARY): $(LIB_OBJECTS)
+	@mkdir -p $(dir $@)
+	$(AR) rcs $@ $^
+	@echo "Built static library: $(LIBRARY)"
+
+# Shared library
+$(SHARED_LIB): $(LIB_OBJECTS)
+	@mkdir -p $(dir $@)
+	$(CC) -shared -o $@ $^
+	@echo "Built shared library: $(SHARED_LIB)"
+
+# --- Tools Linking ---
+
+tools: $(TOOL) $(FUSE_TOOL)
+
+$(TOOL): $(TOOL_OBJECTS)
+	@mkdir -p $(dir $@)
+	$(CC) $(TOOL_CFLAGS) $^ -o $@
+	@echo "Built tool: $(TOOL)"
+
+$(FUSE_TOOL): $(FUSE_OBJECTS) $(LIB_OBJECTS)
+	@mkdir -p $(dir $@)
+	$(CC) $(TOOL_CFLAGS) $(FUSE_OBJECTS) $(LIB_OBJECTS) -o $@ $(shell pkg-config --libs fuse)
+	@echo "Built FUSE driver: $(FUSE_TOOL)"
+
+# --- Compilation Rules ---
+
+# Note: We use specific rules to ensure the correct flags (LIB vs TOOL) are applied 
+# to the specific files, mirroring your original setup.
+
+# Compile C sources for library (PIC)
+$(OBJ_DIR)/src/instfs.o: src/instfs.c
+	@mkdir -p $(dir $@)
+	$(CC) $(LIB_CFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/src/osmp_meta.o: src/osmp_meta.c
+	@mkdir -p $(dir $@)
+	$(CC) $(LIB_CFLAGS) -c $< -o $@
+
+# Compile C sources for tools
+$(OBJ_DIR)/src/mkfs.osmp.o: src/mkfs.osmp.c
+	@mkdir -p $(dir $@)
+	$(CC) $(TOOL_CFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/src/instfs_fuse.o: src/instfs_fuse.c
+	@mkdir -p $(dir $@)
+	$(CC) $(TOOL_CFLAGS) $(shell pkg-config --cflags fuse) -c $< -o $@
+
+# Assemble ASM sources
+$(OBJ_DIR)/src/headerfs.o: src/headerfs.S
+	@mkdir -p $(dir $@)
+	$(AS) $(ASFLAGS) $< -o $@
+
+# --- Housekeeping ---
+
+# Clean build artifacts
+clean:
+	rm -rf $(BUILD_DIR)
+	@echo "Cleaned build artifacts"
+
+# Install
+install: $(LIBRARY) $(SHARED_LIB)
+	install -d $(DESTDIR)/usr/local/lib
+	install -m 644 $(LIBRARY) $(DESTDIR)/usr/local/lib/
+	install -m 755 $(SHARED_LIB) $(DESTDIR)/usr/local/lib/
+	install -d $(DESTDIR)/usr/local/bin
+	install -m 755 $(TOOL) $(DESTDIR)/usr/local/bin/
+	install -m 755 $(FUSE_TOOL) $(DESTDIR)/usr/local/bin/
+	install -d $(DESTDIR)/usr/local/include
+	install -m 644 src/instfs.h $(DESTDIR)/usr/local/include/
+	install -m 644 src/osmp_meta.h $(DESTDIR)/usr/local/include/
+	@echo "Installed InstFS library and tools"
+
+# Dependencies
+$(OBJ_DIR)/src/instfs.o: src/instfs.h
+$(OBJ_DIR)/src/osmp_meta.o: src/osmp_meta.h src/instfs.h
+$(OBJ_DIR)/src/instfs_fuse.o: src/instfs.h src/osmp_meta.h
