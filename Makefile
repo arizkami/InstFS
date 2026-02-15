@@ -18,7 +18,7 @@ ASFLAGS =
 # --- Files ---
 
 # Library source files
-C_SOURCES = src/instfs.c src/osmp_meta.c
+C_SOURCES = src/instfs.c src/osmp_meta.c src/stream.c
 ASM_SOURCES = src/headerfs.S
 
 # Map sources to objects in the build directory
@@ -28,6 +28,12 @@ LIB_OBJECTS = $(C_SOURCES:%.c=$(OBJ_DIR)/%.o) $(ASM_SOURCES:%.S=$(OBJ_DIR)/%.o)
 TOOL_SOURCES = src/mkfs.osmp.c
 TOOL_OBJECTS = $(TOOL_SOURCES:%.c=$(OBJ_DIR)/%.o)
 
+INSPECT_SOURCES = src/inspect_osmp.c
+INSPECT_OBJECTS = $(INSPECT_SOURCES:%.c=$(OBJ_DIR)/%.o)
+
+TEST_STREAM_SOURCES = src/test_stream.c
+TEST_STREAM_OBJECTS = $(TEST_STREAM_SOURCES:%.c=$(OBJ_DIR)/%.o)
+
 FUSE_SOURCES = src/instfs_fuse.c
 FUSE_OBJECTS = $(FUSE_SOURCES:%.c=$(OBJ_DIR)/%.o)
 
@@ -35,6 +41,8 @@ FUSE_OBJECTS = $(FUSE_SOURCES:%.c=$(OBJ_DIR)/%.o)
 LIBRARY = $(BUILD_DIR)/libinstfs.a
 SHARED_LIB = $(BUILD_DIR)/libinstfs.so
 TOOL = $(BUILD_DIR)/mkfs.osmp
+INSPECT_TOOL = $(BUILD_DIR)/inspect_osmp
+TEST_STREAM = $(BUILD_DIR)/test_stream
 FUSE_TOOL = $(BUILD_DIR)/instfs_fuse
 
 .PHONY: all clean install tools
@@ -57,12 +65,22 @@ $(SHARED_LIB): $(LIB_OBJECTS)
 
 # --- Tools Linking ---
 
-tools: $(TOOL) $(FUSE_TOOL)
+tools: $(TOOL) $(INSPECT_TOOL) $(TEST_STREAM) $(FUSE_TOOL)
 
-$(TOOL): $(TOOL_OBJECTS)
+$(TOOL): $(TOOL_OBJECTS) $(LIB_OBJECTS)
 	@mkdir -p $(dir $@)
 	$(CC) $(TOOL_CFLAGS) $^ -o $@
 	@echo "Built tool: $(TOOL)"
+
+$(INSPECT_TOOL): $(INSPECT_OBJECTS) $(LIB_OBJECTS)
+	@mkdir -p $(dir $@)
+	$(CC) $(TOOL_CFLAGS) $^ -o $@
+	@echo "Built tool: $(INSPECT_TOOL)"
+
+$(TEST_STREAM): $(TEST_STREAM_OBJECTS) $(LIB_OBJECTS)
+	@mkdir -p $(dir $@)
+	$(CC) $(TOOL_CFLAGS) $^ -o $@ -lm
+	@echo "Built tool: $(TEST_STREAM)"
 
 $(FUSE_TOOL): $(FUSE_OBJECTS) $(LIB_OBJECTS)
 	@mkdir -p $(dir $@)
@@ -83,8 +101,20 @@ $(OBJ_DIR)/src/osmp_meta.o: src/osmp_meta.c
 	@mkdir -p $(dir $@)
 	$(CC) $(LIB_CFLAGS) -c $< -o $@
 
+$(OBJ_DIR)/src/stream.o: src/stream.c
+	@mkdir -p $(dir $@)
+	$(CC) $(LIB_CFLAGS) -c $< -o $@
+
 # Compile C sources for tools
 $(OBJ_DIR)/src/mkfs.osmp.o: src/mkfs.osmp.c
+	@mkdir -p $(dir $@)
+	$(CC) $(TOOL_CFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/src/inspect_osmp.o: src/inspect_osmp.c
+	@mkdir -p $(dir $@)
+	$(CC) $(TOOL_CFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/src/test_stream.o: src/test_stream.c
 	@mkdir -p $(dir $@)
 	$(CC) $(TOOL_CFLAGS) -c $< -o $@
 
@@ -111,6 +141,8 @@ install: $(LIBRARY) $(SHARED_LIB)
 	install -m 755 $(SHARED_LIB) $(DESTDIR)/usr/local/lib/
 	install -d $(DESTDIR)/usr/local/bin
 	install -m 755 $(TOOL) $(DESTDIR)/usr/local/bin/
+	install -m 755 $(INSPECT_TOOL) $(DESTDIR)/usr/local/bin/
+	install -m 755 $(TEST_STREAM) $(DESTDIR)/usr/local/bin/
 	install -m 755 $(FUSE_TOOL) $(DESTDIR)/usr/local/bin/
 	install -d $(DESTDIR)/usr/local/include
 	install -m 644 src/instfs.h $(DESTDIR)/usr/local/include/
@@ -120,4 +152,8 @@ install: $(LIBRARY) $(SHARED_LIB)
 # Dependencies
 $(OBJ_DIR)/src/instfs.o: src/instfs.h
 $(OBJ_DIR)/src/osmp_meta.o: src/osmp_meta.h src/instfs.h
+$(OBJ_DIR)/src/stream.o: src/stream.h src/instfs.h
+$(OBJ_DIR)/src/mkfs.osmp.o: src/instfs.h src/osmp_meta.h
+$(OBJ_DIR)/src/inspect_osmp.o: src/instfs.h src/osmp_meta.h
+$(OBJ_DIR)/src/test_stream.o: src/instfs.h src/stream.h src/intro.h
 $(OBJ_DIR)/src/instfs_fuse.o: src/instfs.h src/osmp_meta.h
