@@ -9,10 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
+#include "portability.h"
+#ifndef _WIN32
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
+#endif
 
 #define OSMP_MAGIC "OSMP_IMG"
 
@@ -24,8 +24,12 @@ typedef struct {
 
 /* Concrete definition of the OSMP_Meta_t handle */
 struct OSMP_Meta_t {
+#ifdef _WIN32
+    mmap_handle_t mmap_handle;
+#else
     const uint8_t* mapped_file;     // Pointer to the start of the mmap'ed OSMP file
     size_t mapped_size;           // Full size of the mmap'ed file
+#endif
     const uint8_t* meta_partition;  // Pointer to the start of the metadata partition
     size_t meta_size;             // Size of the metadata partition
 };
@@ -33,6 +37,7 @@ struct OSMP_Meta_t {
 /*
  * Mount the metadata partition from an .osmp container file
  */
+#ifndef _WIN32
 OSMP_Meta_t* osmp_meta_mount(const char* filepath) {
     int fd = open(filepath, O_RDONLY);
     if (fd == -1) return NULL;
@@ -80,15 +85,58 @@ OSMP_Meta_t* osmp_meta_mount(const char* filepath) {
 
     return meta;
 }
+#else // _WIN32
+OSMP_Meta_t* osmp_meta_mount(const char* filepath) {
+    mmap_handle_t mmap_h;
+    size_t file_size;
+    const uint8_t* mapped = mmap_file(filepath, &file_size, &mmap_h);
+    if (!mapped) {
+        return NULL;
+    }
+
+    if (file_size < sizeof(osmp_master_header_t)) {
+        unmap_file(&mmap_h);
+        return NULL;
+    }
+
+    const osmp_master_header_t* header = (const osmp_master_header_t*)mapped;
+    if (memcmp(header->magic, OSMP_MAGIC, 8) != 0) {
+        unmap_file(&mmap_h);
+        return NULL;
+    }
+
+    OSMP_Meta_t* meta = (OSMP_Meta_t*)calloc(1, sizeof(OSMP_Meta_t));
+    if (!meta) {
+        unmap_file(&mmap_h);
+        return NULL;
+    }
+
+    meta->mmap_handle = mmap_h;
+    meta->meta_partition = mapped + header->meta_offset;
+    meta->meta_size = header->meta_size;
+
+    // Bounds check
+    if (header->meta_offset + header->meta_size > file_size) {
+        osmp_meta_unmount(meta);
+        return NULL;
+    }
+
+    return meta;
+}
+#endif // _WIN32
 
 /*
  * Unmount an OSMP metadata archive and release resources
  */
 void osmp_meta_unmount(OSMP_Meta_t* meta) {
     if (!meta) return;
+#ifdef _WIN32
+    unmap_file(&meta->mmap_handle);
+#else
     if (meta->mapped_file) {
         munmap((void*)meta->mapped_file, meta->mapped_size);
     }
+#endif
     free(meta);
 }
 

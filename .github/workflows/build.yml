@@ -7,14 +7,26 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
 
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev
+      run: sudo apt-get update && sudo apt-get install -y build-essential
 
     - name: Build
       run: make all
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup MSVC environment
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Build with NMake
+      run: nmake /f Makefile.win

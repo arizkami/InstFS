@@ -8,12 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* For file-based mounting with mmap */
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/mman.h>
+#include "portability.h"
 
 /* Magic Numbers */
 #define OSMP_MAGIC "OSMP_IMG"
@@ -49,9 +44,13 @@ struct InstFS_t {
     instfs_header_t* header;      /* Pointer to the header within the partition */
     instfs_entry_t* entries;      /* Pointer to the instrument table */
     
+#ifdef _WIN32
+    mmap_handle_t mmap_handle;
+#else
     /* For unmapping a region from a larger file */
     const uint8_t* mmap_start;    /* The actual start of the mmaped region */
     size_t mmap_size;             /* The actual size of the mmaped region */
+#endif
 };
 
 /* Internal helper to initialize a handle from a memory region */
@@ -89,6 +88,7 @@ static InstFS_t* _instfs_init_from_mem(const void* data, size_t size) {
 /*
  * Mount an InstFS partition from an .osmp container file
  */
+#ifndef _WIN32
 InstFS_t* instfs_mount_osmp(const char* filepath, osmp_master_header_t* master_header_out) {
     int fd = open(filepath, O_RDONLY);
     if (fd == -1) return NULL;
@@ -112,7 +112,7 @@ InstFS_t* instfs_mount_osmp(const char* filepath, osmp_master_header_t* master_h
     off_t instfs_part_offset = header.instfs_offset;
 
     // mmap requires offset to be a multiple of page size
-    off_t page_size = sysconf(_SC_PAGE_SIZE);
+    off_t page_size = get_page_size();
     off_t offset_in_page = instfs_part_offset % page_size;
     off_t mmap_offset = instfs_part_offset - offset_in_page;
     size_t mmap_size = instfs_part_size + offset_in_page;
@@ -135,6 +135,51 @@ InstFS_t* instfs_mount_osmp(const char* filepath, osmp_master_header_t* master_h
 
     return fs;
 }
+#else // _WIN32
+InstFS_t* instfs_mount_osmp(const char* filepath, osmp_master_header_t* master_header_out) {
+    mmap_handle_t mmap_h;
+    size_t file_size;
+    const uint8_t* mapped = mmap_file(filepath, &file_size, &mmap_h);
+    if (!mapped) {
+        return NULL;
+    }
+
+    if (file_size < sizeof(osmp_master_header_t)) {
+        unmap_file(&mmap_h);
+        return NULL;
+    }
+
+    osmp_master_header_t header;
+    memcpy(&header, mapped, sizeof(osmp_master_header_t));
+
+    if (memcmp(header.magic, OSMP_MAGIC, 8) != 0) {
+        unmap_file(&mmap_h);
+        return NULL;
+    }
+    
+    if (master_header_out) {
+        *master_header_out = header;
+    }
+
+    size_t instfs_part_size = header.instfs_size;
+    uint64_t instfs_part_offset = header.instfs_offset;
+
+    if (instfs_part_offset + instfs_part_size > file_size) {
+        unmap_file(&mmap_h);
+        return NULL;
+    }
+
+    const uint8_t* instfs_data = mapped + instfs_part_offset;
+    InstFS_t* fs = _instfs_init_from_mem(instfs_data, instfs_part_size);
+    if (fs) {
+        fs->mmap_handle = mmap_h;
+    } else {
+        unmap_file(&mmap_h);
+    }
+
+    return fs;
+}
+#endif // _WIN32
 
 /*
  * Mount an InstFS image from a memory buffer
@@ -142,8 +187,12 @@ InstFS_t* instfs_mount_osmp(const char* filepath, osmp_master_header_t* master_h
 InstFS_t* instfs_mount_mem(const void* data, size_t size) {
     InstFS_t* fs = _instfs_init_from_mem(data, size);
     if (fs) {
+#ifdef _WIN32
+        memset(&fs->mmap_handle, 0, sizeof(mmap_handle_t));
+#else
         fs->mmap_start = NULL; // Not memory-mapped
         fs->mmap_size = 0;
+#endif
     }
     return fs;
 }
@@ -153,9 +202,13 @@ InstFS_t* instfs_mount_mem(const void* data, size_t size) {
  */
 void instfs_unmount(InstFS_t* fs) {
     if (!fs) return;
+#ifdef _WIN32
+    unmap_file(&fs->mmap_handle);
+#else
     if (fs->mmap_start) {
         munmap((void*)fs->mmap_start, fs->mmap_size);
     }
+#endif
     free(fs);
 }
 

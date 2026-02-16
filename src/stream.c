@@ -9,7 +9,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include "portability.h"
+#ifndef _WIN32
 #include <sys/mman.h>
+#endif
 #include <errno.h>
 
 /* Concrete definition of stream handle */
@@ -45,6 +48,7 @@ InstFS_Stream_t* stream_open(InstFS_t* fs, uint32_t index, stream_mode_t mode) {
     }
     
     /* Apply initial madvise hints based on mode */
+#ifdef __linux__
     if (mode == STREAM_MODE_SEQUENTIAL) {
         madvise((void*)stream->data_ptr, stream->data_size, MADV_SEQUENTIAL);
     } else if (mode == STREAM_MODE_RANDOM) {
@@ -52,6 +56,7 @@ InstFS_Stream_t* stream_open(InstFS_t* fs, uint32_t index, stream_mode_t mode) {
     } else if (mode == STREAM_MODE_WILLNEED) {
         madvise((void*)stream->data_ptr, stream->data_size, MADV_WILLNEED);
     }
+#endif
     
     return stream;
 }
@@ -63,9 +68,11 @@ void stream_close(InstFS_Stream_t* stream) {
     if (!stream) return;
     
     /* Advise kernel we're done with this data */
+#ifdef __linux__
     if (stream->data_ptr && stream->data_size > 0) {
         madvise((void*)stream->data_ptr, stream->data_size, MADV_DONTNEED);
     }
+#endif
     
     free(stream);
 }
@@ -182,6 +189,7 @@ const void* stream_get_ptr(InstFS_Stream_t* stream, size_t* available) {
  * Advise kernel about access pattern
  */
 int stream_advise(InstFS_Stream_t* stream, uint64_t offset, size_t length, int advice) {
+#ifdef __linux__
     if (!stream) return -1;
     
     if (offset >= stream->data_size) return -1;
@@ -192,6 +200,13 @@ int stream_advise(InstFS_Stream_t* stream, uint64_t offset, size_t length, int a
     }
     
     return madvise((void*)(stream->data_ptr + offset), length, advice);
+#else
+    (void)stream;
+    (void)offset;
+    (void)length;
+    (void)advice;
+    return -1; // Not supported
+#endif
 }
 
 /*

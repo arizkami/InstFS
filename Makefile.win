@@ -1,0 +1,88 @@
+# InstFS Makefile for Windows (MSVC)
+# Builds the Instrument File System library and tools
+
+CC = cl
+AS = ml64
+AR = lib
+
+# Directories
+SRC_DIR = src
+BUILD_DIR = build
+OBJ_DIR = $(BUILD_DIR)\obj
+
+# Flags
+# /EHsc - Enable C++ exception handling
+# /W3 - Warning level 3
+# /O2 - Optimize for speed
+# /I - Add include directory
+# /c - Compile only
+LIB_CFLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc /c
+TOOL_CFLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc
+ASFLAGS = /c
+
+# --- Files ---
+
+# Library source files
+C_SOURCES = src\instfs.c src\osmp_meta.c src\stream.c src\portability.c
+ASM_SOURCES = src\headerfs.S
+
+# Map sources to objects in the build directory
+LIB_OBJECTS = $(OBJ_DIR)\instfs.obj $(OBJ_DIR)\osmp_meta.obj $(OBJ_DIR)\stream.obj $(OBJ_DIR)\headerfs.obj $(OBJ_DIR)\portability.obj
+
+# Tool source files
+TOOL_MKFS_SOURCES = src\mkfs.osmp.c
+TOOL_MKFS_OBJECTS = $(OBJ_DIR)\mkfs.osmp.obj
+
+TOOL_INSPECT_SOURCES = src\inspect_osmp.c
+TOOL_INSPECT_OBJECTS = $(OBJ_DIR)\inspect_osmp.obj
+
+TOOL_TEST_STREAM_SOURCES = src\test_stream.c
+TOOL_TEST_STREAM_OBJECTS = $(OBJ_DIR)\test_stream.obj
+
+# Outputs (placed in build directory)
+LIBRARY = $(BUILD_DIR)\instfs.lib
+TOOL_MKFS = $(BUILD_DIR)\mkfs.osmp.exe
+TOOL_INSPECT = $(BUILD_DIR)\inspect_osmp.exe
+TOOL_TEST_STREAM = $(BUILD_DIR)	est_stream.exe
+
+all: $(LIBRARY) $(TOOL_MKFS) $(TOOL_INSPECT) $(TOOL_TEST_STREAM)
+
+# --- Library Linking ---
+
+$(LIBRARY): $(LIB_OBJECTS)
+	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
+	$(AR) /OUT:$@ $(LIB_OBJECTS)
+	@echo Built static library: $@
+
+# --- Tools Linking ---
+
+$(TOOL_MKFS): $(TOOL_MKFS_OBJECTS) $(LIBRARY)
+	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
+	$(CC) $(TOOL_CFLAGS) /Fe$@ $(TOOL_MKFS_OBJECTS) $(LIBRARY)
+	@echo Built tool: $@
+
+$(TOOL_INSPECT): $(TOOL_INSPECT_OBJECTS) $(LIBRARY)
+	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
+	$(CC) $(TOOL_CFLAGS) /Fe$@ $(TOOL_INSPECT_OBJECTS) $(LIBRARY)
+	@echo Built tool: $@
+
+$(TOOL_TEST_STREAM): $(TOOL_TEST_STREAM_OBJECTS) $(LIBRARY)
+	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
+	$(CC) $(TOOL_CFLAGS) /Fe$@ $(TOOL_TEST_STREAM_OBJECTS) $(LIBRARY)
+	@echo Built tool: $@
+
+# --- Compilation Rules ---
+
+# nmake has built-in rules for .c.obj
+.c{$(SRC_DIR)}.obj{$(OBJ_DIR)}:
+    $(CC) $(LIB_CFLAGS) $<
+
+.S{$(SRC_DIR)}.obj{$(OBJ_DIR)}:
+    $(AS) $(ASFLAGS) /Fo $@ $<
+
+# --- Housekeeping ---
+
+clean:
+	-@del $(BUILD_DIR)\*.* /s /q
+	-@rmdir $(BUILD_DIR) /s /q
+	@echo Cleaned build artifacts.

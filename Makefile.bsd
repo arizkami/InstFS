@@ -1,0 +1,150 @@
+# InstFS Makefile
+# Builds the Instrument File System library and tools
+
+CC = cc
+AS = as
+AR = ar
+
+# Directories
+SRC_DIR = src
+BUILD_DIR = build
+OBJ_DIR = $(BUILD_DIR)/obj
+
+# Flags
+LIB_CFLAGS = -Wall -Wextra -O2 -fPIC -I$(SRC_DIR)
+TOOL_CFLAGS = -Wall -Wextra -O2 -I$(SRC_DIR)
+ASFLAGS = 
+
+# --- Files ---
+
+# Library source files
+C_SOURCES = src/instfs.c src/osmp_meta.c src/stream.c src/portability.c
+ASM_SOURCES = src/headerfs.S
+
+# Map sources to objects in the build directory
+LIB_OBJECTS = $(C_SOURCES:%.c=$(OBJ_DIR)/%.o) $(ASM_SOURCES:%.S=$(OBJ_DIR)/%.o)
+
+# Tool source files
+TOOL_SOURCES = src/mkfs.osmp.c
+TOOL_OBJECTS = $(TOOL_SOURCES:%.c=$(OBJ_DIR)/%.o)
+
+INSPECT_SOURCES = src/inspect_osmp.c
+INSPECT_OBJECTS = $(INSPECT_SOURCES:%.c=$(OBJ_DIR)/%.o)
+
+TEST_STREAM_SOURCES = src/test_stream.c
+TEST_STREAM_OBJECTS = $(TEST_STREAM_SOURCES:%.c=$(OBJ_DIR)/%.o)
+
+
+
+# Outputs (placed in build directory)
+LIBRARY = $(BUILD_DIR)/libinstfs.a
+SHARED_LIB = $(BUILD_DIR)/libinstfs.so
+TOOL = $(BUILD_DIR)/mkfs.osmp
+INSPECT_TOOL = $(BUILD_DIR)/inspect_osmp
+TEST_STREAM = $(BUILD_DIR)/test_stream
+
+
+DIRS = $(OBJ_DIR)/src $(BUILD_DIR)
+
+.PHONY: all clean install tools setup
+
+all: setup $(LIBRARY) $(SHARED_LIB) tools
+
+setup:
+	@mkdir -p $(DIRS)
+
+# --- Library Linking ---
+
+# Static library
+$(LIBRARY): $(LIB_OBJECTS)
+	$(AR) rcs $@ $^
+	@echo "Built static library: $(LIBRARY)"
+
+# Shared library
+$(SHARED_LIB): $(LIB_OBJECTS)
+	$(CC) -shared -o $@ $^
+	@echo "Built shared library: $(SHARED_LIB)"
+
+# --- Tools Linking ---
+
+tools: $(TOOL) $(INSPECT_TOOL) $(TEST_STREAM)
+
+$(TOOL): $(TOOL_OBJECTS) $(LIB_OBJECTS)
+	$(CC) $(TOOL_CFLAGS) $^ -o $@
+	@echo "Built tool: $(TOOL)"
+
+$(INSPECT_TOOL): $(INSPECT_OBJECTS) $(LIB_OBJECTS)
+	$(CC) $(TOOL_CFLAGS) $^ -o $@
+	@echo "Built tool: $(INSPECT_TOOL)"
+
+$(TEST_STREAM): $(TEST_STREAM_OBJECTS) $(LIB_OBJECTS)
+	$(CC) $(TOOL_CFLAGS) $^ -o $@ -lm
+	@echo "Built tool: $(TEST_STREAM)"
+
+
+
+# --- Compilation Rules ---
+
+# Note: We use specific rules to ensure the correct flags (LIB vs TOOL) are applied 
+# to the specific files, mirroring your original setup.
+
+# Compile C sources for library (PIC)
+$(OBJ_DIR)/src/instfs.o: src/instfs.c
+	$(CC) $(LIB_CFLAGS) -c src/instfs.c -o $@
+
+$(OBJ_DIR)/src/osmp_meta.o: src/osmp_meta.c
+	$(CC) $(LIB_CFLAGS) -c src/osmp_meta.c -o $@
+
+$(OBJ_DIR)/src/stream.o: src/stream.c
+	$(CC) $(LIB_CFLAGS) -c src/stream.c -o $@
+
+# Compile C sources for tools
+$(OBJ_DIR)/src/mkfs.osmp.o: src/mkfs.osmp.c
+	$(CC) $(TOOL_CFLAGS) -c src/mkfs.osmp.c -o $@
+
+$(OBJ_DIR)/src/inspect_osmp.o: src/inspect_osmp.c
+	$(CC) $(TOOL_CFLAGS) -c src/inspect_osmp.c -o $@
+
+$(OBJ_DIR)/src/test_stream.o: src/test_stream.c
+	$(CC) $(TOOL_CFLAGS) -c src/test_stream.c -o $@
+
+$(OBJ_DIR)/src/portability.o: src/portability.c
+	$(CC) $(LIB_CFLAGS) -c src/portability.c -o $@
+
+
+
+
+# Assemble ASM sources
+$(OBJ_DIR)/src/headerfs.o: src/headerfs.S
+	$(AS) $(ASFLAGS) src/headerfs.S -o $@
+
+
+# --- Housekeeping ---
+
+# Clean build artifacts
+clean:
+	rm -rf $(BUILD_DIR)
+	@echo "Cleaned build artifacts"
+
+# Install
+install: $(LIBRARY) $(SHARED_LIB)
+	install -d $(DESTDIR)/usr/local/lib
+	install -m 644 $(LIBRARY) $(DESTDIR)/usr/local/lib/
+	install -m 755 $(SHARED_LIB) $(DESTDIR)/usr/local/lib/
+	install -d $(DESTDIR)/usr/local/bin
+	install -m 755 $(TOOL) $(DESTDIR)/usr/local/bin/
+	install -m 755 $(INSPECT_TOOL) $(DESTDIR)/usr/local/bin/
+	install -m 755 $(TEST_STREAM) $(DESTDIR)/usr/local/bin/
+	install -d $(DESTDIR)/usr/local/include
+	install -m 644 src/instfs.h $(DESTDIR)/usr/local/include/
+	install -m 644 src/osmp_meta.h $(DESTDIR)/usr/local/include/
+	@echo "Installed InstFS library and tools"
+
+# Dependencies
+$(OBJ_DIR)/src/instfs.o: src/instfs.h
+$(OBJ_DIR)/src/osmp_meta.o: src/osmp_meta.h src/instfs.h
+$(OBJ_DIR)/src/stream.o: src/stream.h src/instfs.h
+$(OBJ_DIR)/src/mkfs.osmp.o: src/instfs.h src/osmp_meta.h
+$(OBJ_DIR)/src/inspect_osmp.o: src/instfs.h src/osmp_meta.h
+$(OBJ_DIR)/src/test_stream.o: src/instfs.h src/stream.h src/intro.h
+$(OBJ_DIR)/src/portability.o: src/portability.h
