@@ -14,9 +14,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <dirent.h>
-#include <sys/stat.h>
 #include <ctype.h>
+
+/* Include portability layer first for cross-platform support */
+#include "portability.h"
 
 /* Include InstFS headers for structure definitions */
 #include "instfs.h"
@@ -343,7 +344,16 @@ uint64_t write_meta_files(FILE* out_fp, const char* meta_dir) {
 
     uint64_t total_bytes_written = 0;
     while ((entry = readdir(dir)) != NULL) {
+        // Skip . and ..
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+#ifdef _WIN32
+        snprintf(path, sizeof(path), "%s\\%s", meta_dir, entry->d_name);
+#else
         snprintf(path, sizeof(path), "%s/%s", meta_dir, entry->d_name);
+#endif
         struct stat path_stat;
         if (stat(path, &path_stat) != 0 || S_ISDIR(path_stat.st_mode)) {
             // Skip directories and files we can't stat

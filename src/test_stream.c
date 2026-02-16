@@ -7,45 +7,16 @@
 #include "instfs.h"
 #include "stream.h"
 #include "intro.h"
+#include "portability.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <unistd.h>
 #include <math.h>
 
-/* Memory usage tracking */
-typedef struct {
-    long rss_kb;      /* Resident Set Size in KB */
-    long vsize_kb;    /* Virtual memory size in KB */
-    long shared_kb;   /* Shared memory in KB */
-} memory_info_t;
-
-/* Get current memory usage */
-static int get_memory_usage(memory_info_t* info) {
-    FILE* fp = fopen("/proc/self/status", "r");
-    if (!fp) return -1;
-    
-    char line[256];
-    info->rss_kb = 0;
-    info->vsize_kb = 0;
-    info->shared_kb = 0;
-    
-    while (fgets(line, sizeof(line), fp)) {
-        if (strncmp(line, "VmRSS:", 6) == 0) {
-            sscanf(line + 6, "%ld", &info->rss_kb);
-        } else if (strncmp(line, "VmSize:", 7) == 0) {
-            sscanf(line + 7, "%ld", &info->vsize_kb);
-        } else if (strncmp(line, "RssFile:", 8) == 0) {
-            sscanf(line + 8, "%ld", &info->shared_kb);
-        }
-    }
-    
-    fclose(fp);
-    return 0;
-}
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 /* Format memory size */
 static void format_memory(long kb, char* buf, size_t buf_size) {
@@ -78,7 +49,7 @@ static void print_memory_usage(const char* label) {
 static uint64_t get_time_us(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return (uint64_t)tv.tv_sec * 1000000 + tv.tv_usec;
+    return (uint64_t)tv.tv_sec * 1000000ULL + (uint64_t)tv.tv_usec;
 }
 
 /* Format bytes to human-readable string */
