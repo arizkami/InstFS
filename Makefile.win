@@ -76,35 +76,35 @@ $(TOOL_TEST_STREAM): $(TOOL_TEST_STREAM_OBJECTS) $(LIBRARY)
 
 $(OBJ_DIR)\instfs.obj: src\instfs.c
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(LIB_CFLAGS) /Fo$@ $<
+	$(CC) $(LIB_CFLAGS) /Fo$@ src\instfs.c
 
 $(OBJ_DIR)\osmp_meta.obj: src\osmp_meta.c
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(LIB_CFLAGS) /Fo$@ $<
+	$(CC) $(LIB_CFLAGS) /Fo$@ src\osmp_meta.c
 
 $(OBJ_DIR)\stream.obj: src\stream.c
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(LIB_CFLAGS) /Fo$@ $<
+	$(CC) $(LIB_CFLAGS) /Fo$@ src\stream.c
 
 $(OBJ_DIR)\portability.obj: src\portability.c
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(LIB_CFLAGS) /Fo$@ $<
+	$(CC) $(LIB_CFLAGS) /Fo$@ src\portability.c
 
 $(OBJ_DIR)\headerfs.obj: src\headerfs.S
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(AS) $(ASFLAGS) /Fo$@ $<
+	$(AS) $(ASFLAGS) /Fo$@ src\headerfs.S
 
 $(OBJ_DIR)\mkfs.osmp.obj: src\mkfs.osmp.c
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ $<
+	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ src\mkfs.osmp.c
 
 $(OBJ_DIR)\inspect_osmp.obj: src\inspect_osmp.c
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ $<
+	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ src\inspect_osmp.c
 
 $(OBJ_DIR)\test_stream.obj: src\test_stream.c
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ $<
+	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ src\test_stream.c
 
 # --- Housekeeping ---
 
