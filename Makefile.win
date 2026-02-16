@@ -2,7 +2,7 @@
 # Builds the Instrument File System library and tools
 
 CC = cl
-AS = ml64
+AS = nasm
 AR = lib
 
 # Directories
@@ -19,7 +19,7 @@ OBJ_DIR = $(BUILD_DIR)\obj
 LIB_CFLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc /c
 TOOL_COMPILE_FLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc /c
 TOOL_LINK_FLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc
-ASFLAGS = /c
+ASFLAGS = -f win64
 
 # --- Files ---
 
@@ -92,7 +92,7 @@ $(OBJ_DIR)\portability.obj: src\portability.c
 
 $(OBJ_DIR)\headerfs.obj: src\headerfs.S
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(AS) $(ASFLAGS) /Fo$@ src\headerfs.S
+	$(AS) $(ASFLAGS) -o $@ src\headerfs.S
 
 $(OBJ_DIR)\mkfs.osmp.obj: src\mkfs.osmp.c
 	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"

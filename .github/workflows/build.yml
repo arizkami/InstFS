@@ -28,6 +28,10 @@ jobs:
     - name: Setup MSVC environment
       uses: ilammy/msvc-dev-cmd@v1
 
+    - name: Install NASM
+      shell: powershell
+      run: choco install nasm
+
     - name: Build with NMake
       shell: cmd
       run: nmake /f Makefile.win
