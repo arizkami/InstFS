@@ -48,7 +48,7 @@ InstFS_Stream_t* stream_open(InstFS_t* fs, uint32_t index, stream_mode_t mode) {
     }
     
     /* Apply initial madvise hints based on mode */
-#ifdef __linux__
+#ifndef _WIN32
     if (mode == STREAM_MODE_SEQUENTIAL) {
         madvise((void*)stream->data_ptr, stream->data_size, MADV_SEQUENTIAL);
     } else if (mode == STREAM_MODE_RANDOM) {
@@ -68,7 +68,7 @@ void stream_close(InstFS_Stream_t* stream) {
     if (!stream) return;
     
     /* Advise kernel we're done with this data */
-#ifdef __linux__
+#ifndef _WIN32
     if (stream->data_ptr && stream->data_size > 0) {
         madvise((void*)stream->data_ptr, stream->data_size, MADV_DONTNEED);
     }
@@ -185,11 +185,11 @@ const void* stream_get_ptr(InstFS_Stream_t* stream, size_t* available) {
     return stream->data_ptr + stream->position;
 }
 
+#ifndef _WIN32
 /*
  * Advise kernel about access pattern
  */
 int stream_advise(InstFS_Stream_t* stream, uint64_t offset, size_t length, int advice) {
-#ifdef __linux__
     if (!stream) return -1;
     
     if (offset >= stream->data_size) return -1;
@@ -200,13 +200,6 @@ int stream_advise(InstFS_Stream_t* stream, uint64_t offset, size_t length, int a
     }
     
     return madvise((void*)(stream->data_ptr + offset), length, advice);
-#else
-    (void)stream;
-    (void)offset;
-    (void)length;
-    (void)advice;
-    return -1; // Not supported
-#endif
 }
 
 /*
@@ -215,6 +208,28 @@ int stream_advise(InstFS_Stream_t* stream, uint64_t offset, size_t length, int a
 int stream_prefetch(InstFS_Stream_t* stream, uint64_t offset, size_t length) {
     return stream_advise(stream, offset, length, MADV_WILLNEED);
 }
+#else // _WIN32
+/*
+ * Advise kernel about access pattern (Windows dummy)
+ */
+int stream_advise(InstFS_Stream_t* stream, uint64_t offset, size_t length, int advice) {
+    (void)stream;
+    (void)offset;
+    (void)length;
+    (void)advice;
+    return -1; // Not supported on Windows
+}
+
+/*
+ * Prefetch data into cache (Windows dummy)
+ */
+int stream_prefetch(InstFS_Stream_t* stream, uint64_t offset, size_t length) {
+    (void)stream;
+    (void)offset;
+    (void)length;
+    return -1; // Not supported on Windows
+}
+#endif // _WIN32
 
 /*
  * Get stream statistics
