@@ -6,18 +6,32 @@
 #ifdef _WIN32
 
 void* mmap_file(const char* filepath, size_t* size, mmap_handle_t* handle) {
-    handle->hFile = CreateFile(filepath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    handle->hFile = CreateFileA(filepath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (handle->hFile == INVALID_HANDLE_VALUE) {
         return NULL;
     }
 
-    *size = GetFileSize(handle->hFile, NULL);
-    if (*size == INVALID_FILE_SIZE) {
+    // Use GetFileSizeEx for 64-bit file size support
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(handle->hFile, &fileSize)) {
         CloseHandle(handle->hFile);
         return NULL;
     }
+    
+    // Check if file size fits in size_t (important for 32-bit builds)
+    if (fileSize.QuadPart > SIZE_MAX) {
+        CloseHandle(handle->hFile);
+        return NULL;
+    }
+    
+    *size = (size_t)fileSize.QuadPart;
 
-    handle->hMapping = CreateFileMapping(handle->hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+    // For files larger than 4GB, we need to pass the high DWORD
+    DWORD dwMaximumSizeHigh = (DWORD)(fileSize.QuadPart >> 32);
+    DWORD dwMaximumSizeLow = (DWORD)(fileSize.QuadPart & 0xFFFFFFFF);
+    
+    handle->hMapping = CreateFileMappingA(handle->hFile, NULL, PAGE_READONLY, 
+                                          dwMaximumSizeHigh, dwMaximumSizeLow, NULL);
     if (handle->hMapping == NULL) {
         CloseHandle(handle->hFile);
         return NULL;
@@ -125,7 +139,13 @@ int get_memory_usage(memory_info_t* info) {
     if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
         info->rss_kb = pmc.WorkingSetSize / 1024;
         info->vsize_kb = pmc.PrivateUsage / 1024;
-        info->shared_kb = 0; // Not easily available on Windows
+        
+        // On Windows, memory-mapped files don't show up in these metrics
+        // WorkingSetSize = physical memory in use (includes mapped files that are paged in)
+        // PrivateUsage = committed private memory (not including mapped files)
+        // We can't reliably calculate shared memory on Windows like Linux does
+        info->shared_kb = 0;
+        
         return 0;
     }
     return -1;

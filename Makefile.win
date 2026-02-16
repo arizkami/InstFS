@@ -1,114 +1,77 @@
-# InstFS Makefile for Windows (MSVC)
-# Builds the Instrument File System library and tools
+# MediaKit Root Makefile for Windows (NMAKE)
+# Builds MediaKitFoundation and all modules
 
-CC = cl
-AS = nasm
-AR = lib
+# Platform
+PLATFORM = windows
 
-# Directories
-SRC_DIR = src
+# Project information
+PROJECT_NAME = MediaKit
+VERSION = 1.0.0
+
+# Build directories
 BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)\obj
+LIB_DIR = $(BUILD_DIR)\lib
+BIN_DIR = $(BUILD_DIR)\bin
 
-# Flags
-# /EHsc - Enable C++ exception handling
-# /W3 - Warning level 3
-# /O2 - Optimize for speed
-# /I - Add include directory
-# /c - Compile only
-LIB_CFLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc /c
-TOOL_COMPILE_FLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc /c
-TOOL_LINK_FLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc
+# Compiler settings
+CC = cl
+AR = lib
+AS = nasm
+
+CFLAGS = /W3 /O2 /EHsc /c
+ARFLAGS = /OUT:
 ASFLAGS = -f win64
 
-# --- Files ---
+OBJ_EXT = .obj
+LIB_PREFIX =
+LIB_EXT = .lib
+RM = del /Q
+RMDIR = rmdir /S /Q
+MKDIR = mkdir
 
-# Library source files
-C_SOURCES = src\instfs.c src\osmp_meta.c src\stream.c src\portability.c
-ASM_SOURCES = src\headerfs.S
+# MediaKitFoundation library
+MKF_LIB = $(BUILD_DIR)\MediaKitFoundation$(LIB_EXT)
+MKF_OBJ = $(OBJ_DIR)\MediaKitFoundation$(OBJ_EXT)
 
-# Map sources to objects in the build directory
-LIB_OBJECTS = $(OBJ_DIR)\instfs.obj $(OBJ_DIR)\osmp_meta.obj $(OBJ_DIR)\stream.obj $(OBJ_DIR)\headerfs.obj $(OBJ_DIR)\portability.obj
+# Modules
+MODULES = InstFS DAUx
 
-# Tool source files
-TOOL_MKFS_SOURCES = src\mkfs.osmp.c
-TOOL_MKFS_OBJECTS = $(OBJ_DIR)\mkfs.osmp.obj
+all: foundation modules
 
-TOOL_INSPECT_SOURCES = src\inspect_osmp.c
-TOOL_INSPECT_OBJECTS = $(OBJ_DIR)\inspect_osmp.obj
+foundation: $(MKF_LIB)
 
-TOOL_TEST_STREAM_SOURCES = src\test_stream.c
-TOOL_TEST_STREAM_OBJECTS = $(OBJ_DIR)\test_stream.obj
+$(MKF_LIB): $(MKF_OBJ)
+	@if not exist "$(BUILD_DIR)" $(MKDIR) "$(BUILD_DIR)"
+	$(AR) $(ARFLAGS)$@ $(MKF_OBJ)
+	@echo Built MediaKitFoundation library: $@
 
-# Outputs (placed in build directory)
-LIBRARY = $(BUILD_DIR)\instfs.lib
-TOOL_MKFS = $(BUILD_DIR)\mkfs.osmp.exe
-TOOL_INSPECT = $(BUILD_DIR)\inspect_osmp.exe
-TOOL_TEST_STREAM = $(BUILD_DIR)	est_stream.exe
+$(MKF_OBJ): MediaKitFoundation.c MediaKitFoundation.h
+	@if not exist "$(OBJ_DIR)" $(MKDIR) "$(OBJ_DIR)"
+	$(CC) $(CFLAGS) /Fo$@ MediaKitFoundation.c
 
-all: $(LIBRARY) $(TOOL_MKFS) $(TOOL_INSPECT) $(TOOL_TEST_STREAM)
-
-# --- Library Linking ---
-
-$(LIBRARY): $(LIB_OBJECTS)
-	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-	$(AR) /OUT:$@ $(LIB_OBJECTS)
-	@echo Built static library: $@
-
-# --- Tools Linking ---
-
-$(TOOL_MKFS): $(TOOL_MKFS_OBJECTS) $(LIBRARY)
-	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-	$(CC) $(TOOL_LINK_FLAGS) /Fe$@ $(TOOL_MKFS_OBJECTS) $(LIBRARY)
-	@echo Built tool: $@
-
-$(TOOL_INSPECT): $(TOOL_INSPECT_OBJECTS) $(LIBRARY)
-	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-	$(CC) $(TOOL_LINK_FLAGS) /Fe$@ $(TOOL_INSPECT_OBJECTS) $(LIBRARY)
-	@echo Built tool: $@
-
-$(TOOL_TEST_STREAM): $(TOOL_TEST_STREAM_OBJECTS) $(LIBRARY)
-	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-	$(CC) $(TOOL_LINK_FLAGS) /Fe$@ $(TOOL_TEST_STREAM_OBJECTS) $(LIBRARY)
-	@echo Built tool: $@
-
-# --- Compilation Rules ---
-
-$(OBJ_DIR)\instfs.obj: src\instfs.c
-	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(LIB_CFLAGS) /Fo$@ src\instfs.c
-
-$(OBJ_DIR)\osmp_meta.obj: src\osmp_meta.c
-	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(LIB_CFLAGS) /Fo$@ src\osmp_meta.c
-
-$(OBJ_DIR)\stream.obj: src\stream.c
-	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(LIB_CFLAGS) /Fo$@ src\stream.c
-
-$(OBJ_DIR)\portability.obj: src\portability.c
-	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(LIB_CFLAGS) /Fo$@ src\portability.c
-
-$(OBJ_DIR)\headerfs.obj: src\headerfs.S
-	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(AS) $(ASFLAGS) -o $@ src\headerfs.S
-
-$(OBJ_DIR)\mkfs.osmp.obj: src\mkfs.osmp.c
-	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ src\mkfs.osmp.c
-
-$(OBJ_DIR)\inspect_osmp.obj: src\inspect_osmp.c
-	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ src\inspect_osmp.c
-
-$(OBJ_DIR)\test_stream.obj: src\test_stream.c
-	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
-	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ src\test_stream.c
-
-# --- Housekeeping ---
+modules: foundation
+	@echo Building modules for Windows...
+	@cd InstFS && $(MAKE) /NOLOGO /F Makefile.win
+	@cd DAUx && $(MAKE) /NOLOGO /F Makefile.win
 
 clean:
-	-@del $(BUILD_DIR)\*.* /s /q
-	-@rmdir $(BUILD_DIR) /s /q
-	@echo Cleaned build artifacts.
+	-@if exist "$(BUILD_DIR)" $(RMDIR) "$(BUILD_DIR)"
+	@cd InstFS && $(MAKE) /NOLOGO /F Makefile.win clean
+	@cd DAUx && $(MAKE) /NOLOGO /F Makefile.win clean
+	@echo Cleaned all build artifacts
+
+help:
+	@echo MediaKit Build System for Windows
+	@echo ==================================
+	@echo.
+	@echo Targets:
+	@echo   all        - Build foundation and all modules (default)
+	@echo   foundation - Build MediaKitFoundation library only
+	@echo   modules    - Build all modules
+	@echo   clean      - Remove all build artifacts
+	@echo   help       - Show this help message
+	@echo.
+	@echo Usage:
+	@echo   nmake /F Makefile.win
+	@echo   nmake /F Makefile.win clean

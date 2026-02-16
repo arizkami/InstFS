@@ -39,9 +39,15 @@ static void print_memory_usage(const char* label) {
         format_memory(mem.shared_kb, shared_str, sizeof(shared_str));
         
         printf("  Memory [%s]:\n", label);
+#ifdef _WIN32
+        printf("    Working Set: %s (physical memory in use)\n", rss_str);
+        printf("    Private:     %s (committed private memory)\n", vsize_str);
+        printf("    Note: Memory-mapped files are not included in these metrics on Windows\n");
+#else
         printf("    RSS:    %s (resident)\n", rss_str);
         printf("    VSize:  %s (virtual)\n", vsize_str);
         printf("    Shared: %s (file-backed)\n", shared_str);
+#endif
     }
 }
 

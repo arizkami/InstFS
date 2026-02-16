@@ -1,0 +1,62 @@
+# DAUx Makefile for Windows (NMAKE)
+# Direct Audio Engine - WASAPI Backend
+
+# Platform
+PLATFORM = windows
+
+# Module information
+MODULE_NAME = DAUx
+VERSION = 1.0.0
+
+# Directories
+SRC_DIR = src
+INC_DIR = include
+BUILD_DIR = build
+OBJ_DIR = $(BUILD_DIR)\obj
+LIB_DIR = $(BUILD_DIR)\lib
+
+# Compiler settings
+CC = cl
+AR = lib
+AS = nasm
+
+CFLAGS = /W3 /O2 /EHsc /I$(INC_DIR) /I.. /c
+ARFLAGS = /OUT:
+ASFLAGS = -f win64
+
+# Source files
+C_SOURCES = $(SRC_DIR)\DAUx.c $(SRC_DIR)\stream.c
+ASM_SOURCES = $(SRC_DIR)\accel.S
+
+# Object files
+C_OBJECTS = $(OBJ_DIR)\DAUx.obj $(OBJ_DIR)\stream.obj
+ASM_OBJECTS = $(OBJ_DIR)\accel.obj
+ALL_OBJECTS = $(C_OBJECTS) $(ASM_OBJECTS)
+
+# Output library
+LIBRARY = $(LIB_DIR)\$(MODULE_NAME).lib
+
+all: $(LIBRARY)
+
+$(LIBRARY): $(ALL_OBJECTS)
+	@if not exist "$(LIB_DIR)" mkdir "$(LIB_DIR)"
+	$(AR) $(ARFLAGS)$@ $(ALL_OBJECTS)
+	@echo Built $(MODULE_NAME) library: $@
+
+# Compile C sources
+$(OBJ_DIR)\DAUx.obj: $(SRC_DIR)\DAUx.c
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(CC) $(CFLAGS) /Fo$@ $(SRC_DIR)\DAUx.c
+
+$(OBJ_DIR)\stream.obj: $(SRC_DIR)\stream.c
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(CC) $(CFLAGS) /Fo$@ $(SRC_DIR)\stream.c
+
+# Assemble ASM sources
+$(OBJ_DIR)\accel.obj: $(SRC_DIR)\accel.S
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(AS) $(ASFLAGS) -o $@ $(SRC_DIR)\accel.S
+
+clean:
+	-@if exist "$(BUILD_DIR)" rmdir /S /Q "$(BUILD_DIR)"
+	@echo Cleaned $(MODULE_NAME)

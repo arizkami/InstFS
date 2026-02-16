@@ -354,7 +354,11 @@ uint64_t write_meta_files(FILE* out_fp, const char* meta_dir) {
 #else
         snprintf(path, sizeof(path), "%s/%s", meta_dir, entry->d_name);
 #endif
+#ifdef _WIN32
+        struct _stat path_stat;
+#else
         struct stat path_stat;
+#endif
         if (stat(path, &path_stat) != 0 || S_ISDIR(path_stat.st_mode)) {
             // Skip directories and files we can't stat
             continue;

@@ -15,6 +15,8 @@
     #define open _open
     #define read _read
     #define close _close
+    
+    // Stat functions - use struct _stat on Windows
     #define stat _stat
     #define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
 

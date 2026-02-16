@@ -1,0 +1,140 @@
+# mk.mkf.module - Shared build rules for MediaKit modules
+# Supports Linux, Windows (MSVC), and BSD
+
+# Detect platform if not specified
+ifndef PLATFORM
+    ifeq ($(OS),Windows_NT)
+        PLATFORM := windows
+    else
+        UNAME_S := $(shell uname -s)
+        ifeq ($(UNAME_S),Linux)
+            PLATFORM := linux
+        else ifeq ($(UNAME_S),FreeBSD)
+            PLATFORM := bsd
+        else ifeq ($(UNAME_S),OpenBSD)
+            PLATFORM := bsd
+        else ifeq ($(UNAME_S),NetBSD)
+            PLATFORM := bsd
+        else ifeq ($(UNAME_S),Darwin)
+            PLATFORM := macos
+        else
+            PLATFORM := posix
+        endif
+    endif
+endif
+
+# Root directory (where MediaKitFoundation is)
+ROOT_DIR ?= $(shell cd ../.. && pwd)
+MKF_INCLUDE := $(ROOT_DIR)
+MKF_LIB := $(ROOT_DIR)/build
+
+# Build directories
+BUILD_DIR ?= build
+OBJ_DIR := $(BUILD_DIR)/obj
+BIN_DIR := $(BUILD_DIR)/bin
+LIB_DIR := $(BUILD_DIR)/lib
+
+# Platform-specific settings
+ifeq ($(PLATFORM),windows)
+    # Windows with MSVC
+    CC := cl
+    AR := lib
+    AS := nasm
+    
+    CFLAGS := /W3 /O2 /I$(MKF_INCLUDE) /EHsc
+    LDFLAGS := 
+    ARFLAGS := /OUT:
+    ASFLAGS := -f win64
+    
+    OBJ_EXT := .obj
+    LIB_PREFIX := 
+    LIB_EXT := .lib
+    EXE_EXT := .exe
+    SO_EXT := .dll
+    
+    RM := del /Q
+    RMDIR := rmdir /S /Q
+    MKDIR := mkdir
+    PATH_SEP := \\
+    
+else ifeq ($(PLATFORM),bsd)
+    # BSD systems
+    CC := cc
+    AR := ar
+    AS := nasm
+    
+    CFLAGS := -Wall -Wextra -O2 -fPIC -I$(MKF_INCLUDE)
+    LDFLAGS := -L$(MKF_LIB)
+    ARFLAGS := rcs
+    ASFLAGS := -f elf64
+    
+    OBJ_EXT := .o
+    LIB_PREFIX := lib
+    LIB_EXT := .a
+    EXE_EXT :=
+    SO_EXT := .so
+    
+    RM := rm -f
+    RMDIR := rm -rf
+    MKDIR := mkdir -p
+    PATH_SEP := /
+    
+else
+    # Linux and other POSIX
+    CC := gcc
+    AR := ar
+    AS := nasm
+    
+    CFLAGS := -Wall -Wextra -O2 -fPIC -I$(MKF_INCLUDE)
+    LDFLAGS := -L$(MKF_LIB)
+    ARFLAGS := rcs
+    ASFLAGS := -f elf64
+    
+    OBJ_EXT := .o
+    LIB_PREFIX := lib
+    LIB_EXT := .a
+    EXE_EXT :=
+    SO_EXT := .so
+    
+    RM := rm -f
+    RMDIR := rm -rf
+    MKDIR := mkdir -p
+    PATH_SEP := /
+endif
+
+# Common library dependencies
+MKF_LIBS := -lMediaKitFoundation
+
+ifeq ($(PLATFORM),windows)
+    MKF_LIBS += Psapi.lib
+endif
+
+# Pattern rules for compilation
+ifeq ($(PLATFORM),windows)
+$(OBJ_DIR)/%$(OBJ_EXT): %.c
+	@if not exist "$(OBJ_DIR)" $(MKDIR) "$(OBJ_DIR)"
+	$(CC) $(CFLAGS) /c /Fo$@ $<
+
+$(OBJ_DIR)/%$(OBJ_EXT): %.S
+	@if not exist "$(OBJ_DIR)" $(MKDIR) "$(OBJ_DIR)"
+	$(AS) $(ASFLAGS) -o $@ $<
+else
+$(OBJ_DIR)/%$(OBJ_EXT): %.c
+	@$(MKDIR) $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/%$(OBJ_EXT): %.S
+	@$(MKDIR) $(dir $@)
+	$(AS) $(ASFLAGS) -o $@ $<
+endif
+
+# Phony targets
+.PHONY: clean
+
+# Default clean target
+clean:
+ifeq ($(PLATFORM),windows)
+	-@if exist "$(BUILD_DIR)" $(RMDIR) "$(BUILD_DIR)"
+else
+	$(RMDIR) $(BUILD_DIR)
+endif
