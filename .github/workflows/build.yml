@@ -26,7 +26,8 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Setup MSVC environment
-      uses: microsoft/setup-vs-dev-cmd@v1
+      uses: ilammy/msvc-dev-cmd@v1
 
     - name: Build with NMake
+      shell: cmd
       run: nmake /f Makefile.win
