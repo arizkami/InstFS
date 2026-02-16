@@ -1,39 +1,35 @@
-.section .note.GNU-stack,"",%progbits
+; InstFS Header - Assembly bootstrap for instrument filesystem
+; This provides the initial filesystem structure embedded in the binary
 
-/*
- * InstFS Header - Assembly bootstrap for instrument filesystem
- * This provides the initial filesystem structure embedded in the binary
- */
+section .rodata
+align 8
 
-.section .rodata
-.align 8
-
-.global instfs_header_start
-.global instfs_header_end
-.global instfs_header_size
+global instfs_header_start
+global instfs_header_end
+global instfs_header_size
 
 instfs_header_start:
-    /* Magic number: "INSTFS" */
-    .ascii "INSTFS\0\0"
+    ; Magic number: "INSTFS"
+    db "INSTFS", 0x00, 0x00
     
-    /* Version: 1.0 */
-    .long 0x00010000
+    ; Version: 1.0 (0x00010000)
+    dd 0x00010000
     
-    /* Number of instruments */
-    .word 0
+    ; Number of instruments (0)
+    dw 0
     
-    /* Offset to instrument table */
-    .quad 56
+    ; Offset to instrument table (56)
+    dq 56
     
-    /* Reserved for future use */
-    .quad 0, 0, 0, 0
+    ; Reserved for future use (0, 0, 0, 0)
+    dq 0, 0, 0, 0
 
 instrument_table:
-    /* Instrument entries will be added here */
-    /* Format: [name_offset, data_offset, data_size, format] */
+    ; Instrument entries will be added here
+    ; Format: [name_offset, data_offset, data_size, format]
     
 instfs_header_end:
 
-.global instfs_header_size
+global instfs_header_size
 instfs_header_size:
-    .quad instfs_header_end - instfs_header_start
+    dq instfs_header_end - instfs_header_start

@@ -6,11 +6,6 @@
 # For Windows, use nmake with Makefile.win:
 # > nmake /f Makefile.win
 
-UNAME_S := $(shell uname -s)
+SHELL := /bin/sh
 
-ifeq ($(UNAME_S),FreeBSD)
-    include Makefile.bsd
-else
-    # Default to linux makefile for Linux and other Unix-like systems
-    include Makefile.linux
-endif
+include $(shell test "`uname -s`" = "FreeBSD" && echo "Makefile.bsd" || echo "Makefile.linux")

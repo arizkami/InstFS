@@ -14,10 +14,10 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y build-essential
+      run: sudo apt-get update && sudo apt-get install -y build-essential nasm
 
     - name: Build
-      run: make all
+      run: make -f Makefile.linux  all
 
   build-windows:
     runs-on: windows-latest

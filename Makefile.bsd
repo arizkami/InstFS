@@ -2,7 +2,7 @@
 # Builds the Instrument File System library and tools
 
 CC = cc
-AS = as
+AS = nasm
 AR = ar
 
 # Directories
@@ -13,7 +13,7 @@ OBJ_DIR = $(BUILD_DIR)/obj
 # Flags
 LIB_CFLAGS = -Wall -Wextra -O2 -fPIC -I$(SRC_DIR)
 TOOL_CFLAGS = -Wall -Wextra -O2 -I$(SRC_DIR)
-ASFLAGS = 
+ASFLAGS = -f elf64
 
 # --- Files ---
 
