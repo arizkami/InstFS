@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <unistd.h>
+
 #include "portability.h"
 #ifndef _WIN32
 #include <sys/mman.h>
