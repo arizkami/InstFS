@@ -17,7 +17,8 @@ OBJ_DIR = $(BUILD_DIR)\obj
 # /I - Add include directory
 # /c - Compile only
 LIB_CFLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc /c
-TOOL_CFLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc
+TOOL_COMPILE_FLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc /c
+TOOL_LINK_FLAGS = /W3 /O2 /I$(SRC_DIR) /EHsc
 ASFLAGS = /c
 
 # --- Files ---
@@ -58,27 +59,52 @@ $(LIBRARY): $(LIB_OBJECTS)
 
 $(TOOL_MKFS): $(TOOL_MKFS_OBJECTS) $(LIBRARY)
 	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-	$(CC) $(TOOL_CFLAGS) /Fe$@ $(TOOL_MKFS_OBJECTS) $(LIBRARY)
+	$(CC) $(TOOL_LINK_FLAGS) /Fe$@ $(TOOL_MKFS_OBJECTS) $(LIBRARY)
 	@echo Built tool: $@
 
 $(TOOL_INSPECT): $(TOOL_INSPECT_OBJECTS) $(LIBRARY)
 	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-	$(CC) $(TOOL_CFLAGS) /Fe$@ $(TOOL_INSPECT_OBJECTS) $(LIBRARY)
+	$(CC) $(TOOL_LINK_FLAGS) /Fe$@ $(TOOL_INSPECT_OBJECTS) $(LIBRARY)
 	@echo Built tool: $@
 
 $(TOOL_TEST_STREAM): $(TOOL_TEST_STREAM_OBJECTS) $(LIBRARY)
 	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-	$(CC) $(TOOL_CFLAGS) /Fe$@ $(TOOL_TEST_STREAM_OBJECTS) $(LIBRARY)
+	$(CC) $(TOOL_LINK_FLAGS) /Fe$@ $(TOOL_TEST_STREAM_OBJECTS) $(LIBRARY)
 	@echo Built tool: $@
 
 # --- Compilation Rules ---
 
-# nmake has built-in rules for .c.obj
-.c{$(SRC_DIR)}.obj{$(OBJ_DIR)}:
-    $(CC) $(LIB_CFLAGS) $<
+$(OBJ_DIR)\instfs.obj: src\instfs.c
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(CC) $(LIB_CFLAGS) /Fo$@ $<
 
-.S{$(SRC_DIR)}.obj{$(OBJ_DIR)}:
-    $(AS) $(ASFLAGS) /Fo $@ $<
+$(OBJ_DIR)\osmp_meta.obj: src\osmp_meta.c
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(CC) $(LIB_CFLAGS) /Fo$@ $<
+
+$(OBJ_DIR)\stream.obj: src\stream.c
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(CC) $(LIB_CFLAGS) /Fo$@ $<
+
+$(OBJ_DIR)\portability.obj: src\portability.c
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(CC) $(LIB_CFLAGS) /Fo$@ $<
+
+$(OBJ_DIR)\headerfs.obj: src\headerfs.S
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(AS) $(ASFLAGS) /Fo$@ $<
+
+$(OBJ_DIR)\mkfs.osmp.obj: src\mkfs.osmp.c
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ $<
+
+$(OBJ_DIR)\inspect_osmp.obj: src\inspect_osmp.c
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ $<
+
+$(OBJ_DIR)\test_stream.obj: src\test_stream.c
+	@if not exist "$(OBJ_DIR)" mkdir "$(OBJ_DIR)"
+	$(CC) $(TOOL_COMPILE_FLAGS) /Fo$@ $<
 
 # --- Housekeeping ---
 
