@@ -1,56 +1,59 @@
-# InstFS Code Review
+# InstFS Repository Review (2026-02)
 
-This document contains a review of the InstFS codebase, including the core C library, command-line tools, and Python scripts.
+This review focuses on build health, portability, API/tooling quality, and maintainability based on the current tree.
 
-## Overall Impression
+## What looks strong
 
-This is an impressive and well-executed project. It provides a complete and performant solution for creating and accessing a custom filesystem for musical instrument data. The architecture is clean, the C code is high-quality, and the supporting tools are comprehensive and thoughtful. The developer demonstrates a strong command of C, systems programming on POSIX-like systems, and the specific problem domain of virtual instruments.
+1. **Clear modular structure**
+   - The workspace has a top-level foundation library plus module-level builds (`InstFS`, `DAUx`), which keeps concerns separated cleanly. The module list and orchestration are explicit in the root build. 
 
-## Strengths
+2. **InstFS module currently builds successfully in isolation**
+   - The `InstFS` submodule compiles and links (`libinstfs.a`, `libinstfs.so`, and CLI tools). That gives confidence that the core filesystem work is in good shape.
 
-### 1.  Clean Architecture
-The project is logically divided into three main parts, each with a clear responsibility:
-*   **`libinstfs` (C Library):** A well-defined, read-only API for accessing the instrument and metadata partitions.
-*   **Command-Line Tools (C):** A suite of utilities (`mkfs.osmp`, `inspect_osmp`, `test_stream`, `instfs_fuse`) for creating, inspecting, testing, and mounting the filesystem.
-*   **Python Scripts:** A toolchain for preparing assets (converting from MIDI and SFZ) for use with the C tools.
+3. **Toolchain completeness is good**
+   - The project includes C utilities (`mkfs.osmp`, `inspect_osmp`, `test_stream`) and Python asset scripts, which is a strong end-to-end developer workflow.
 
-### 2.  Performance-Oriented C Code
-The C code is written with a clear focus on performance, which is critical for handling potentially large audio samples.
-*   **Memory Mapping (`mmap`):** `mmap` is used extensively for file I/O in both `instfs.c` and `osmp_meta.c`. This is highly efficient, as it avoids unnecessary copying and lets the operating system manage memory paging.
-*   **Kernel Hints (`madvice`):** The `stream.c` implementation makes excellent use of `madvice` to give the kernel hints about memory access patterns (`MADV_SEQUENTIAL`, `MADV_RANDOM`, `MADV_WILLNEED`). This is a sign of a developer who understands performance tuning at the system level.
-*   **Zero-Copy Access:** The `stream_get_ptr()` function provides true zero-copy access to the underlying sample data, which is the most efficient way to access the data.
+## Key findings / risks
 
-### 3.  Robust and Comprehensive Tooling
-The tools provided are powerful and demonstrate a commitment to quality and usability.
-*   **`mkfs.osmp`:** A flexible tool for creating filesystem images, supporting both a simple file-based mode and a more advanced JSON-based mode for complex instruments.
-*   **`inspect_osmp`:** A user-friendly utility for debugging and verifying the contents of an `.osmp` file. The JSON preview is a nice touch.
-*   **`test_stream`:** This is a standout feature. It's not just a unit test; it's a comprehensive benchmarking and simulation tool that tests for correctness, performance, memory usage, and real-world application behavior. The melody playback simulation is particularly impressive.
-*   **`instfs_fuse`:** A FUSE driver to mount the filesystem, making it accessible to any application.
+1. **Root build is brittle due to hard dependency on DAUx ALSA headers**
+   - The root `Makefile` always builds both `InstFS` and `DAUx` via `MODULES := InstFS DAUx` and exits on first module failure.
+   - In this environment, `DAUx` fails to compile because `<alsa/asoundlib.h>` is unavailable, causing `make` at repo root to fail even though InstFS itself builds.
+   - **Impact:** first-time contributors cannot run a clean root build unless audio dev packages are preinstalled.
 
-### 4.  Complete Asset Toolchain
-The Python scripts show a deep understanding of the user's workflow.
-*   **`midtohex.py`:** A clever utility that not only converts MIDI files into the C header needed for `test_stream` but also includes a simple synthesizer to preview the melody.
-*   **`sfz_to_json.py`:** A robust parser for the SFZ format, a standard for defining virtual instruments. This allows users to work with existing, powerful tools and then easily package their creations into the OSMP format.
-*   **`verify_json_samples.py`:** A simple but essential pre-flight check to ensure that all required sample files exist before creating a filesystem image.
+2. **Linker executable-stack warning from assembly object**
+   - Linking InstFS artifacts emits warnings that `headerfs.o` is missing `.note.GNU-stack`.
+   - **Impact:** modern toolchains treat this increasingly strictly; future linkers may hard-fail.
 
-## Areas for Improvement
+3. **`test_stream` note-name formatting warning and potential edge behavior**
+   - `midi_to_note_name()` writes into `static char buf[8]` with `snprintf("%s%d", ...)`, which currently triggers `-Wformat-truncation` during build optimization.
+   - While practical values may be small, the warning indicates compiler-visible paths where truncation can occur.
 
-### 1.  Hand-Rolled JSON Parser in `mkfs.osmp.c`
-This is the most significant weakness in the project. The custom JSON parser in `mkfs.osmp.c` is long, complex, and likely not robust against all valid JSON formatting or potential edge cases.
-*   **Recommendation:** Replace the manual parser with a small, well-tested, and dependency-free JSON library like `cJSON` or `jsmn`. This would make `mkfs.osmp` more robust, reduce the maintenance burden, and shrink the codebase.
+4. **Developer UX issue: `test_stream --help` interpreted as a filename**
+   - Running `./build/test_stream --help` attempts to mount `--help` as an OSMP file and exits with “Failed to mount OSMP file”.
+   - **Impact:** command discoverability is weak; users cannot quickly find invocation options.
 
-### 2.  Metadata Archive Performance (`osmp_meta.c`)
-The functions in `osmp_meta.c` that find and access files in the metadata archive do so by performing a linear scan from the beginning of the archive.
-*   **Impact:** This will be slow if the archive contains a large number of files.
-*   **Recommendation:** For the current use case, this is likely not a major issue. However, if the number of metadata files is expected to grow, a more efficient data structure could be used. Options include:
-    *   Adding an index (like a hash table or a sorted list of file entries) at the beginning of the metadata partition.
-    *   Requiring that the files be sorted by name and using a binary search.
+## Recommendations (priority order)
 
-### 3.  Platform-Specific Code in `test_stream.c`
-The memory usage reporting in `test_stream.c` reads from `/proc/self/status`.
-*   **Impact:** This is not portable and will only work on Linux and some other Unix-like systems.
-*   **Recommendation:** Since `test_stream` is a developer-facing tool, this is a minor issue. However, for broader portability, this feature could be wrapped in `#ifdef __linux__` directives.
+1. **Make DAUx optional at top-level build**
+   - Add feature flags or environment switches (e.g., `WITH_DAUX=0`) and/or detect ALSA headers in DAUx make logic.
+   - Keep default build resilient: build available modules and print a clear skipped-module summary.
 
-## Conclusion
+2. **Fix GNU-stack annotation in assembly**
+   - Add the appropriate non-executable stack note in `headerfs.S` (and DAUx assembly where relevant).
 
-This is a high-quality project that is well-designed, performant, and feature-rich. The few areas for improvement are relatively minor and do not detract from the overall quality of the work. The developer should be commended for their skill in C programming, system-level optimization, and building a complete, user-friendly toolchain.
+3. **Resolve `midi_to_note_name()` truncation warning**
+   - Increase buffer size and/or clamp/validate midi inputs before formatting.
+
+4. **Add explicit CLI usage handling in `test_stream`**
+   - Handle `-h/--help` before attempting file operations.
+
+5. **Document dependency tiers**
+   - In the README and/or build output, separate mandatory dependencies (for InstFS) from optional module dependencies (DAUx/ALSA/FUSE variants).
+
+## Commands run for this review
+
+- `make -j4` (root): **failed** at DAUx due to missing ALSA headers.
+- `make -j4` inside `InstFS/`: **pass**.
+- `./build/mkfs.osmp` inside `InstFS/`: printed usage.
+- `./build/test_stream --help` inside `InstFS/`: treated as input file and failed to mount.
+
